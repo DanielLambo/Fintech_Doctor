@@ -1,186 +1,146 @@
 # 🩺 Fintech Doctor
 
-A Claude skill (`compliance-doctor`) that deep-scans your codebase for the legal, regulatory, security and money-losing risks in vibe-coded apps. It prints a diagnosis with a severity verdict, real penalties by law, what you could owe, what you did right, and a prescription for what to fix first.
+You vibe-coded an app. It works. But is it *legal*?
 
-**It diagnoses; it never edits your code.**
+Fintech Doctor is an AI skill that reads through your codebase like a very blunt doctor. You get back a diagnosis covering what could get you fined, sued, robbed, or worse, plus what you got right, roughly what it could cost you, and what to fix first.
 
-## Sample output
+**It only diagnoses. It never touches your code.**
 
 ```text
 ||==========================================================================
 ||
 ||    🩺  C O M P L I A N C E   D O C T O R
 ||
-||    Patient   ::  vibe-wallet
-||    Severity  ::  ▓▓ ROYALLY FUCKED ▓▓
+||    Patient   ::  your-app
+||    Severity  ::  ▓▓ ?????????????? ▓▓
 ||    Mode      ::  LIVE
-||    Stack     ::  Next.js 14 · Prisma · Stripe · Open Payments · Twilio
 ||
 ||==========================================================================
-||  📊 VITALS                                    19 verified · showing top 5
-||==========================================================================
-||
-||    🔴  Crime              ███                3
-||    🟠  Fines              ████████           8
-||    🟡  Money bugs         ███████            7
-||    🟢  Tech debt          █                  1
-||
-||==========================================================================
-||  💚 HEALTHY VITALS  —  what you did right
-||==========================================================================
-||
-||    ✔  All DB access goes through Prisma; no raw SQL, so no injection paths
-||                                                          src/lib/db.ts
-||    ✔  Card entry never touches your server; no PAN or CVV anywhere in schema
-||                                                          prisma/schema.prisma
-||    ✔  Uses the official Open Payments SDK instead of hand-rolled ILP signing
-||                                                          package.json:1
-||
-||==========================================================================
-||  🩻 DIAGNOSIS
-||==========================================================================
-||
-||  #1  🔴  THE IRS IS ALREADY LOOKING FOR YOU
-||  --------------------------------------------------------------------------
-||      Problem  |  Landing page says "Your new bank" and "Your money is FDIC
-||               |  insured", but there's no charter and no partner bank.
-||      Where    |  src/app/page.tsx:4
-||      Penalty  |  18 USC 709 — misusing the FDIC name is a federal crime (fine +
-||               |  up to 1 yr); FDIC civil money penalties, 12 USC 1828(a)(4);
-||               |  state banking codes bar calling yourself a bank.
-||      Fix      |  Delete both claims; later, use your partner's exact "Member FDIC"
-||               |  disclosure.
-||
-||  #2  🔴  THE IRS IS ALREADY LOOKING FOR YOU
-||  --------------------------------------------------------------------------
-||      Problem  |  User funds sit in `User.balance` and move between users inside
-||               |  your own DB. No sponsor bank or licensed processor holds them.
-||      Where    |  src/app/api/transfer/route.ts:7-8, prisma/schema.prisma:5
-||      Penalty  |  18 USC 1960 — unlicensed money transmission, felony (fines + up
-||               |  to 5 yrs); 31 USC 5330 — no FinCEN MSB registration, up to
-||               |  $5,000/day; plus state money transmitter penalties.
-||      Fix      |  Move custody to a sponsor bank FBO or BaaS partner before taking
-||               |  more real deposits.
-||
-||  #3  🔴  THE IRS IS ALREADY LOOKING FOR YOU
-||  --------------------------------------------------------------------------
-||      Problem  |  A user-facing alert says the account was "flagged for suspicious
-||               |  activity and reported to FinCEN."
-||      Where    |  src/lib/alerts.ts:1
-||      Penalty  |  31 USC 5318(g)(2) — disclosing a SAR is prohibited; civil
-||               |  penalties (31 USC 5321), criminal up to $250k + 5 yrs (§5322).
-||      Fix      |  Use neutral copy ("We need more information to complete this
-||               |  transfer"); keep flag reasons admin-only.
-||
-||  #4  🟠  GET A LAWYER ON SPEED DIAL
-||  --------------------------------------------------------------------------
-||      Problem  |  Transfers run with no sanctions screening of sender or recipient.
-||      Where    |  src/app/api/transfer/route.ts:3 → :8 (no SDN check in path)
-||      Penalty  |  IEEPA, 50 USC 1705 — strict liability, up to $377,700 per
-||               |  violation or 2× the transaction; willful violations are criminal.
-||      Fix      |  Screen users at signup and recipients on every transfer via a
-||               |  sanctions API; log each result.
-||
-||  #5  🟠  GET A LAWYER ON SPEED DIAL
-||  --------------------------------------------------------------------------
-||      Problem  |  Landing page promises "Earn 8% APY on every dollar" with no bank
-||               |  interest program or registered broker behind it.
-||      Where    |  src/app/page.tsx:5
-||      Penalty  |  Securities Act §5 + state securities laws — unregistered yield
-||               |  product; BlockFi paid $100M to the SEC and states for this.
-||      Fix      |  Remove the APY claim until a bank partner's disclosed interest
-||               |  program backs it.
-||
-||==========================================================================
-||  💸 THE BILL          all 19 findings · statutory worst case, not a prediction
-||==========================================================================
-||
-||      Government fines    ||   $560k  –  $5.9M
-||      Lawsuit exposure    ||   $5.5k  –  $520k
-||      Criminal exposure   ||   YES — #1, #2, #3
-||      Direct losses       ||   uncapped: anyone can debit any account (#12),
-||                          ||   forged webhooks mint balance (#13)
-||
-||      Assumed: 250 users · 60 days live · 4 transfers/user/mo · 12% in CA
-||
-||==========================================================================
-||  💊 PRESCRIPTION       next steps in order · nothing has been changed
-||==========================================================================
-||
-||    [ TODAY ]
-||      1. Pull "your new bank", "FDIC insured", "8% APY" + countdown   → #1 #5 #6
-||      2. Rotate the leaked sk_live_ key; untrack .env; purge git history → #14
-||      3. Swap the "reported to FinCEN" alert for neutral copy           → #3
-||    [ THIS WEEK ]
-||      4. Take sender from the session, not body.userId; scope
-||         /api/accounts/[id] to its owner                                → #12 #9
-||      5. Pause real-money transfers until a licensed partner holds
-||         funds; then register with FinCEN                               → #2
-||      6. Add a KYC + sanctions vendor at signup and on every transfer   → #4 #7
-||    [ BEFORE YOU SCALE ]
-||      7. Verify webhook signatures; integer cents + double-entry ledger
-||         + idempotency keys                                    → #13 #15 #16 #17
-||
-||==========================================================================
-||  📋 Want the full report? 14 more findings (6 🟠 · 7 🟡 · 1 🟢)
-||     Say "full report".
-||  ⚖️  Not legal advice — talk to a fintech lawyer before launch.
-||==========================================================================
+||  📊 VITALS  ...
+||  💚 HEALTHY VITALS  ...
+||  🩻 DIAGNOSIS  ...
+||  💸 THE BILL  ...
+||  💊 PRESCRIPTION  ...
 ```
 
-## Install
+What's behind the `??????`? Run it and find out. 🙃
 
-**Claude Code** (personal skill, available in every project):
+---
+
+## What it looks at
+
+- **Money:** moving it, holding it, lending it, promising yield on it, storing it as a float
+- **Health data:** HIPAA, plus the rules that apply when HIPAA doesn't
+- **Privacy:** tracking, session replay, biometrics, kids, texts, emails
+- **Consumer law:** subscriptions, dark patterns, accessibility, e-signatures
+- **Security:** leaked keys, open databases, anyone-can-see-anyone's-account bugs
+- **AI-built code:** made-up packages, prompt injection, agents with too much power
+
+It starts by asking you four quick questions so it knows whether you're still in a sandbox or already live, and it scales its findings to match.
+
+---
+
+## Install it in your harness
+
+The skill is the [`compliance-doctor/`](compliance-doctor) folder: a `SKILL.md`, some reference files, and a small Python scanner. Get it first:
 
 ```bash
 git clone https://github.com/DanielLambo/Fintech_Doctor.git
+```
+
+Then pick your tool below.
+
+### Claude Code
+
+```bash
 cp -R Fintech_Doctor/compliance-doctor ~/.claude/skills/
 ```
 
-Then, in any project, run `/compliance-doctor` or ask something like *"run the doctor on this app"* or *"am I going to get fined for this?"*. Add `full` for the uncut report.
+In any project, run `/compliance-doctor`, or just ask *"run the doctor on this app."* Add `full` for the uncut report.
 
-## How it works
+To install it for one repo only, copy it to `.claude/skills/` inside that repo instead.
 
-1. **Triage.** It asks four questions: does real money move, are there real users, is real personal data collected, is anything public. All "no" means **SANDBOX** mode (top 3 findings plus a "before you flip to live keys" checklist). Any "yes" means **LIVE** mode (top 5 findings, the rest on request).
-2. **Scan.** `scripts/scan.py` (stdlib Python, read-only) maps the stack and flags candidate risks with `file:line`. It also checks whether safeguards exist (OFAC screening, idempotency, webhook signatures, RLS, MFA, …) and redacts any secrets it finds.
-3. **Examine.** Claude traces every money path, the auth scoping, the data model and the user-facing copy. Nothing becomes a finding without evidence.
-4. **Grade.**
+### Claude.ai / Claude Desktop
 
-   | Tier | Label | Meaning |
-   |---|---|---|
-   | 🔴 | The IRS is already looking for you | potential crime |
-   | 🟠 | Get a lawyer on speed dial | regulatory fines |
-   | 🟡 | Future you is crying | bugs that lose money |
-   | 🟢 | You're good... mostly | tech debt |
+1. Zip the folder: `cd Fintech_Doctor && zip -r compliance-doctor.zip compliance-doctor`
+2. Go to **Settings → Capabilities → Skills** and upload the zip.
+3. Attach or connect your repo, then ask *"run the compliance doctor on this."*
 
-5. **Bill and prescribe.** It estimates government fines and lawsuit exposure (statutory worst case), flags criminal exposure, and gives next steps grouped as TODAY / THIS WEEK / BEFORE YOU SCALE.
+### OpenAI Codex (CLI / IDE)
 
-## What it checks (~70 risks)
+```bash
+mkdir -p ~/.codex/skills && cp -R Fintech_Doctor/compliance-doctor ~/.codex/skills/
+```
 
-| Area | Highlights |
+Then ask Codex to *"run the compliance doctor."* If your Codex version doesn't load skills, copy the folder into your repo and add this to `AGENTS.md`:
+
+```markdown
+For compliance or pre-launch audits, follow compliance-doctor/SKILL.md exactly.
+```
+
+### GitHub Copilot (agent mode / coding agent)
+
+```bash
+mkdir -p .github/skills && cp -R Fintech_Doctor/compliance-doctor .github/skills/
+```
+
+Commit it, then in Copilot Chat (agent mode) or in an issue assigned to the Copilot coding agent, ask: *"Run the compliance doctor on this repo and post the report."* If skills aren't picked up, add the `AGENTS.md`-style line above to `.github/copilot-instructions.md`, pointing at `.github/skills/compliance-doctor/SKILL.md`.
+
+### Cursor
+
+```bash
+cp -R Fintech_Doctor/compliance-doctor ./compliance-doctor
+mkdir -p .cursor/rules && cp compliance-doctor/SKILL.md .cursor/rules/compliance-doctor.mdc
+```
+
+Then open Agent mode and type *"Run the compliance doctor on this repo."*
+
+### Windsurf / Gemini CLI / other agents
+
+Copy the folder into your repo and point your agent's instruction file at it:
+
+| Tool | Instruction file |
 |---|---|
-| **Fintech** | unlicensed money transmission (18 USC 1960), OFAC, BSA/AML & KYC, SAR tipping-off, Reg E disputes, Remittance Rule (Rafiki/ILP), FDIC/"bank" claims, double-entry ledgers, float money, idempotency & races, unverified webhooks, FCRA/ECOA, TILA/usury/EWA, securities & APY claims, unclaimed property, card-network risk, PCI, GLBA Safeguards, UDAAP, Reg S-P |
-| **HIPAA & health** | HIPAA vs. FTC Health Breach Notification Rule applicability, BAAs, tracking pixels, PHI to LLMs, audit logs, encryption, breach notice, WA My Health My Data |
-| **Privacy & consumer** | COPPA, GDPR (CDN/font leaks), CIPA session replay, BIPA, CCPA/CPRA, TCPA, CAN-SPAM, ADA, ROSCA, E-SIGN, record-keeping, cross-border |
-| **Security** | BOLA / Supabase RLS, hardcoded & `NEXT_PUBLIC_` secrets, client-trusted state, plaintext PII, rate limiting, sensitive logging, MFA, incident response |
-| **AI / vibe-coding** | hallucinated & typosquatted packages, prompt injection with money tools, agent "god mode", unvetted APIs, duplicated logic, test coverage collapse |
+| Windsurf | `.windsurf/rules/compliance-doctor.md` |
+| Gemini CLI | `GEMINI.md` |
+| Anything that reads `AGENTS.md` | `AGENTS.md` |
 
-## Layout
+Add the line: *"For compliance audits, follow compliance-doctor/SKILL.md exactly."*
 
+### Lovable
+
+Lovable can't run the Python scanner, but it can follow the instructions.
+
+1. Connect your project to GitHub and push the `compliance-doctor/` folder into the repo.
+2. Paste this into your project's **Knowledge** / custom instructions:
+   > When I say "run the doctor", read compliance-doctor/SKILL.md and the files in compliance-doctor/references/, skip the scanner step, and produce the report exactly as specified. Do not change any code.
+3. In chat (Chat mode, not edit mode, so it doesn't start "fixing" things): *"Run the doctor."*
+
+### v0
+
+v0 can't run the scanner either.
+
+1. Add `SKILL.md` and the `references/` files to your project as sources or attachments (or paste `SKILL.md` into the project instructions).
+2. Ask: *"Follow SKILL.md and run the compliance doctor on this project. Diagnose only, don't edit code."*
+
+### Bolt / Replit Agent / any chat AI
+
+Run the scanner yourself (below), then give the AI `SKILL.md`, the `references/` folder, the scanner output, and your key files (schema, payment routes, landing page). Say: *"Follow SKILL.md and produce the report."*
+
+### No AI at all
+
+The scanner works on its own, with plain Python 3 and no installs:
+
+```bash
+python3 Fintech_Doctor/compliance-doctor/scripts/scan.py /path/to/your/repo
 ```
-compliance-doctor/
-├── SKILL.md                  workflow, tiers, output format
-├── scripts/scan.py           first-pass scanner (read-only, stdlib only)
-├── references/
-│   ├── fintech.md            F1–F22
-│   ├── security.md           S1–S10
-│   ├── privacy-consumer.md   P1–P12
-│   ├── hipaa.md              H0–H10
-│   ├── ai-vibe.md            A1–A10
-│   └── exposure.md           how "the bill" is priced
-└── examples/sample-report.md
-```
 
-## Disclaimer
+Add `--json` for machine-readable output (handy in CI). It lists suspicious lines and missing safeguards, but the verdict, the bill and the prescription need an AI to verify and weigh the findings.
 
-Penalty figures are statutory maximums as of 2025, and many are adjusted for inflation every year. The bill is a worst-case scale estimate, not a prediction. **This is not legal advice.** Talk to a fintech lawyer before launch.
+---
+
+## Heads up
+
+- **Works best in tools that can open files and run commands** (Claude Code, Codex, Copilot agent, Cursor). Browser builders like Lovable and v0 can only see what's in the project, so the diagnosis is shallower there.
+- **Written for Claude.** Other models usually follow it well but may drift from the format.
+- **Not legal advice.** Penalty figures are statutory maximums as of 2025 and shift with inflation. If the doctor says it's serious, talk to a fintech lawyer before launch.
