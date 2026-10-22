@@ -2,7 +2,7 @@
 
 You vibe-coded an app. It works. But is it *legal*?
 
-Fintech Doctor is an AI skill that reads through your codebase like a very blunt doctor. You get back a diagnosis covering what could get you fined, sued, robbed, or worse, plus what you got right, roughly what it could cost you, and what to fix first.
+Fintech Doctor is an AI skill that reads through your codebase like a very blunt doctor. You get back a diagnosis covering what could get you fined, sued, robbed, or worse, plus what you got right, what the evidence supports about the stakes, and what to fix first.
 
 **It only diagnoses. It never touches your code.**
 
@@ -135,7 +135,7 @@ The scanner works on its own, with plain Python 3 and no installs:
 python3 Fintech_Doctor/compliance-doctor/scripts/scan.py /path/to/your/repo
 ```
 
-Add `--json` for machine-readable output (handy in CI). It lists suspicious lines and missing safeguards, but the verdict, the bill and the prescription need an AI to verify and weigh the findings.
+Add `--json` for machine-readable output and `--fail-on-candidates` for CI triage. Exit codes: `0` = scan completed within its supported scope, `1` = candidates found with the CI flag, `2` = incomplete coverage or invalid invocation. No exit code certifies compliance. Source snippets are omitted to protect credentials; inspect reported file:line locations locally. Coverage reports skipped paths and counts of intentional exclusions (unsupported files, lockfiles, and dependency/build directories). Symlinks are not followed. Python 3.10+ on Linux/macOS is required (safe file opening uses `O_NOFOLLOW`). It lists suspicious lines and missing safeguards, but the verdict, the bill and the prescription need an AI to verify and weigh the findings.
 
 ---
 
@@ -143,4 +143,8 @@ Add `--json` for machine-readable output (handy in CI). It lists suspicious line
 
 - **Works best in tools that can open files and run commands** (Claude Code, Codex, Copilot agent, Cursor). Browser builders like Lovable and v0 can only see what's in the project, so the diagnosis is shallower there.
 - **Written for Claude.** Other models usually follow it well but may drift from the format.
-- **Not legal advice.** Penalty figures are statutory maximums as of 2025 and shift with inflation. If the doctor says it's serious, talk to a fintech lawyer before launch.
+- **Not legal advice.** Historical penalty figures in the references require current authoritative verification before use. The report does not invent usage counts or total hypothetical fines. If the doctor says it's serious, talk to a fintech lawyer before launch.
+
+The doctor should sound like a helpful friend: specific praise when earned, clear risks, and a practical next step. “Nice, your amounts are already in cents. Let's make retries safe next.”
+
+Run regression tests with `python3 -m unittest discover -s tests -v`.

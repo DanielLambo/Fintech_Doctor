@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+import stat
 from pathlib import Path
 
 SKIP_DIRS = {
@@ -137,22 +138,50 @@ MITIGATIONS = [
 ]
 
 
-def iter_files(root: Path):
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+def iter_files(root: Path, coverage: dict):
+    # Keep the scanner nosy about code, never about files outside the patient.
+    def skipped(path, reason):
+        coverage["skipped"].append({"path": str(Path(path).relative_to(root)), "reason": reason})
+
+    def walk_error(error):
+        skipped(error.filename or root, "directory unreadable")
+
+    for dirpath, dirnames, filenames in os.walk(root, onerror=walk_error):
+        retained = []
+        for name in dirnames:
+            directory = Path(dirpath) / name
+            if directory.is_symlink():
+                skipped(directory, "symlink")
+            elif name in SKIP_DIRS:
+                coverage["excluded_directories"] += 1
+            else:
+                retained.append(name)
+        dirnames[:] = retained
         for name in filenames:
-            if name in SKIP_FILES:
-                continue
             p = Path(dirpath) / name
             ext = ".env" if name.startswith(".env") else p.suffix.lower()
-            if ext not in ALL and ext != ".env":
+            if name in SKIP_FILES or (ext not in ALL and ext != ".env" and name != ".gitignore"):
+                coverage["excluded_files"] += 1
                 continue
             try:
-                if p.stat().st_size > MAX_BYTES:
+                # O_NOFOLLOW closes the symlink race between checking and opening.
+                fd = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                with os.fdopen(fd, "rb") as stream:
+                    if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                        skipped(p, "not a regular file")
+                        continue
+                    data = stream.read(MAX_BYTES + 1)
+                if len(data) > MAX_BYTES:
+                    skipped(p, "oversized")
                     continue
-                text = p.read_text(encoding="utf-8", errors="ignore")
-            except OSError:
+                text = data.decode("utf-8")
+            except UnicodeError:
+                skipped(p, "invalid UTF-8")
                 continue
+            except OSError:
+                skipped(p, "unreadable or symlink")
+                continue
+            coverage["scanned_files"] += 1
             yield p, ext, text
 
 
@@ -161,30 +190,25 @@ def is_test(rel: str) -> bool:
     return bool(re.search(r"(^|/)(tests?|__tests__|spec|e2e|cypress|playwright)/|\.(test|spec)\.|_test\.|(^|/)test_", low))
 
 
-def redact(s: str) -> str:
-    return re.sub(SECRET_RE, lambda m: m.group(0)[:4] + "…[redacted]", s)
-
-
 def snippet(line: str, ext: str) -> str:
-    if ext == ".env":  # never echo env values
-        return line.split("=", 1)[0].strip() + "=…[redacted]"
-    s = redact(line.strip())
-    return s if len(s) <= 160 else s[:157] + "..."
+    # A friendly report should never become a second copy of someone's secrets.
+    # Pattern redaction cannot cover arbitrary passwords, PII, or private keys.
+    return "[source omitted; inspect this location locally]"
 
 
-def stack_summary(root: Path) -> list[str]:
+def stack_summary(root: Path, texts: dict) -> list[str]:
     found: list[str] = []
     pkg = root / "package.json"
-    if pkg.exists():
+    if "package.json" in texts:
         try:
-            data = json.loads(pkg.read_text())
+            data = json.loads(texts["package.json"])
             deps = {**data.get("dependencies", {}), **data.get("devDependencies", {})}
             known = ["next", "react", "react-native", "expo", "vue", "svelte", "express", "fastify",
                      "@nestjs/core", "prisma", "@prisma/client", "drizzle-orm", "@supabase/supabase-js",
                      "firebase", "stripe", "plaid", "@interledger/open-payments", "@clerk/nextjs",
                      "next-auth", "openai", "@anthropic-ai/sdk", "ai", "twilio", "resend", "@sendgrid/mail",
                      "@upstash/ratelimit", "@sentry/nextjs", "posthog-js"]
-            found += [f"{k}@{deps[k]}" for k in known if k in deps]
+            found += [k for k in known if k in deps]
             found.append(f"({len(deps)} npm deps total)")
         except (ValueError, OSError):
             found.append("package.json (unparseable)")
@@ -197,10 +221,10 @@ def stack_summary(root: Path) -> list[str]:
     return found
 
 
-def hygiene(root: Path, n_src: int, n_test: int) -> list[str]:
+def hygiene(root: Path, n_src: int, n_test: int, texts: dict) -> list[str]:
     out = [f"test files: {n_test} vs source files: {n_src} (ratio {n_test / max(n_src, 1):.2f})"]
     envs = [p.name for p in root.glob(".env*") if p.is_file()]
-    gi = (root / ".gitignore").read_text(errors="ignore") if (root / ".gitignore").exists() else ""
+    gi = texts.get(".gitignore", "")
     ignored = bool(re.search(r"^\s*\.env", gi, re.M))
     if envs:
         out.append(f"env files present: {', '.join(envs)} · .gitignore covers .env: {'yes' if ignored else 'NO'}")
@@ -215,21 +239,21 @@ def hygiene(root: Path, n_src: int, n_test: int) -> list[str]:
     lock = any((root / f).exists() for f in ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb", "poetry.lock", "uv.lock"])
     out.append(f"lockfile committed: {'yes' if lock else 'NO'}")
     pkg = root / "package.json"
-    if pkg.exists():
+    if "package.json" in texts:
         try:
-            data = json.loads(pkg.read_text())
+            data = json.loads(texts["package.json"])
             deps = sorted({**data.get("dependencies", {}), **data.get("devDependencies", {})})
-            out.append("npm deps (eyeball for hallucinated/typosquat names): " + ", ".join(deps))
+            out.append(f"npm dependencies: {len(deps)} (inspect names locally)")
             scripts = data.get("scripts", {})
             risky = {k: v for k, v in scripts.items() if re.search(r"skip-permissions|--yolo|curl .*\|\s*(ba)?sh", v)}
             if risky:
-                out.append(f"risky npm scripts: {risky}")
+                out.append(f"risky npm scripts: {len(risky)} (inspect package.json locally)")
         except (ValueError, OSError):
             pass
     req = root / "requirements.txt"
-    if req.exists():
-        names = [re.split(r"[<>=~!\[; ]", l.strip())[0] for l in req.read_text(errors="ignore").splitlines() if l.strip() and not l.startswith("#")]
-        out.append("pip deps (eyeball for hallucinated names): " + ", ".join(names))
+    if "requirements.txt" in texts:
+        names = [re.split(r"[<>=~!\[; ]", l.strip())[0] for l in texts["requirements.txt"].splitlines() if l.strip() and not l.startswith("#")]
+        out.append(f"pip requirement lines: {len(names)} (inspect names locally)")
     return out
 
 
@@ -243,9 +267,13 @@ def scan(root: Path, max_hits: int) -> dict:
     signals: dict[str, set[str]] = {s[0]: set() for s in sig_res}
     mitig: dict[tuple[str, str], str | None] = {(m[0], m[1]): None for m in mit_res}
     n_src = n_test = 0
+    texts = {}
+    coverage = {"scanned_files": 0, "excluded_files": 0, "excluded_directories": 0, "skipped": []}
 
-    for p, ext, text in iter_files(root):
+    for p, ext, text in iter_files(root, coverage):
         rel = str(p.relative_to(root))
+        if rel in {"package.json", "requirements.txt", ".gitignore"}:
+            texts[rel] = text
         test = is_test(rel)
         if ext in CODE:
             n_test += test
@@ -276,11 +304,12 @@ def scan(root: Path, max_hits: int) -> dict:
 
     return {
         "root": str(root),
-        "stack": stack_summary(root),
+        "stack": stack_summary(root, texts),
+        "coverage": {**coverage, "complete": bool(coverage["scanned_files"]) and not coverage["skipped"]},
         "signals": {k: sorted(v)[:5] + ([f"(+{len(v) - 5} more)"] if len(v) > 5 else []) for k, v in signals.items() if v},
-        "risks": [{"id": k[0], "label": k[1], "count": counts[k], "hits": v} for k, v in hits.items() if v],
+        "risks": [{"id": k[0], "label": k[1], "count": counts[k], "hits": v} for k, v in hits.items() if counts[k]],
         "mitigations": [{"id": k[0], "label": k[1], "found_at": v} for k, v in mitig.items()],
-        "hygiene": hygiene(root, n_src, n_test),
+        "hygiene": hygiene(root, n_src, n_test, texts),
     }
 
 
@@ -290,6 +319,8 @@ def print_text(r: dict) -> None:
     print(f" compliance-doctor scan :: {r['root']}")
     print(" Candidates only. Read each one in context before calling it a finding.")
     print(bar)
+    print("\n[COVERAGE]", json.dumps(r["coverage"]))
+    print(" Coverage is limited to supported files; this is not a compliance clearance.")
     print("\n[STACK]")
     for s in r["stack"] or ["(nothing recognized)"]:
         print(f"  {s}")
@@ -319,7 +350,10 @@ def main() -> int:
     ap.add_argument("root", nargs="?", default=".")
     ap.add_argument("--max-hits", type=int, default=12)
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--fail-on-candidates", action="store_true", help="exit 1 when risk candidates exist")
     a = ap.parse_args()
+    if a.max_hits < 1:
+        ap.error("--max-hits must be at least 1")
     root = Path(a.root).resolve()
     if not root.is_dir():
         print(f"not a directory: {root}", file=sys.stderr)
@@ -329,7 +363,9 @@ def main() -> int:
         print(json.dumps(result, indent=2))
     else:
         print_text(result)
-    return 0
+    if not result["coverage"]["complete"]:
+        return 2
+    return 1 if a.fail_on_candidates and result["risks"] else 0
 
 
 if __name__ == "__main__":
