@@ -127,6 +127,27 @@ v0 can't run the scanner either.
 
 Run the scanner yourself (below), then give the AI `SKILL.md`, the `references/` folder, the scanner output, and your key files (schema, payment routes, landing page). Say: *"Follow SKILL.md and produce the report."*
 
+### Using something else? Copy this prompt
+
+If your AI tool can open GitHub links and access your project, paste this:
+
+```text
+https://github.com/DanielLambo/Fintech_Doctor/tree/main — run this doctor on my project.
+
+Read compliance-doctor/SKILL.md and follow its audit workflow, using the relevant
+files in compliance-doctor/references/. Start with the triage questions. Run the
+bundled scanner if you can execute Python; otherwise say it wasn't run and
+review the project files you can access. Diagnose only—don't change my code.
+Be a helpful, honest friend: point out what I did well, explain the risks with
+file:line evidence, and tell me what to fix first. Don't expose secrets or
+invent findings, usage numbers, or legal costs. If you can't open the link or
+see my project, tell me exactly which files you need before making claims.
+```
+
+If the tool can't open links, attach `compliance-doctor/SKILL.md`, its `references/`
+folder, and the project files you want reviewed. A link alone doesn't give the AI
+access to your app.
+
 ### No AI at all
 
 The scanner works on its own, with plain Python 3 and no installs:
