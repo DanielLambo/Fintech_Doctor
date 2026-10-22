@@ -2,7 +2,7 @@
 
 You vibe-coded an app. It works. But is it *legal*?
 
-Fintech Doctor is an AI skill that reads through your codebase like a very blunt doctor. You get back a diagnosis covering what could get you fined, sued, robbed, or worse, plus what you got right, what the evidence supports about the stakes, and what to fix first.
+Fintech Doctor is an AI skill that reads through your codebase like a very blunt doctor. You get back a diagnosis covering what could get you fined, sued, robbed, or worse, plus what you got right, what the evidence supports about the stakes, a total of confirmed amounts you owe (or “not established” when records are missing), and what to fix first.
 
 **It only diagnoses. It never touches your code.**
 

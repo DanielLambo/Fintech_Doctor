@@ -39,6 +39,12 @@ Nice, your amounts are already stored in integer cents (`src/payments.ts:12`). T
 ||      Criminal provisions  | None identified in examined path
 ||      Known / unknown      | Sandbox; live volume and jurisdiction unknown
 ||==========================================================================
+||  🧾 TOTAL YOU OWE — confirmed outstanding obligations only
+||      Total you owe       | Not established from available evidence
+||      Completeness        | No obligation or payment records supplied
+||      As of / scope       | Fictional sandbox review; code only
+||      Excluded            | Potential duplicate-credit losses; not a debt
+||==========================================================================
 ||  ✅ BEFORE YOU FLIP TO LIVE KEYS
 ||      [ ]  Add atomic event deduplication and test repeated delivery.
 ||      [ ]  Confirm the processor agreement and responsibility for disputes.

@@ -117,6 +117,8 @@ Sort findings worst-first: by tier, then by verified impact, then by how many us
 
 Follow `references/exposure.md`. Discuss verified findings individually; do not sum hypothetical liabilities. Default to “Not quantified” when inputs or current authority are unverified. Keep government penalties, private claims, contractual fees, and direct losses separate. Criminal applicability is conditional, not a verdict.
 
+Always include **TOTAL YOU OWE** in the report, including sandbox and full reports. Follow the confirmed-obligations rules in `references/exposure.md`: add only documented, outstanding amounts owed by the same entity, cite each item, deduct verified payments/credits, avoid duplicates, and keep currencies separate. If only part is verified, label the sum “Confirmed subtotal — incomplete.” If no debt is established, say “Not established from available evidence,” never infer $0 or turn potential exposure into a bill. This section covers all confirmed obligations in scope, including findings hidden by the top-N limit.
+
 ## 7. Render
 
 Print the report inside a ```text code block so it stays monospaced. The chart has a `||` spine down the left edge, `=` rules for major sections, and `-` rules between findings. **Never draw a right-hand border.** Emoji and wide characters break alignment, so a ragged right edge looks clean and a crooked right border looks broken. Use exactly 74 characters for every `=` and `-` rule.
@@ -177,6 +179,15 @@ When a value runs past about 90 characters, wrap it onto a continuation line tha
 ||      Direct losses       ||   <one line for 🟡 money bugs, or omit the row>
 ||
 ||      Known / unknown: <verified inputs and missing information>
+||
+||==========================================================================
+||  🧾 TOTAL YOU OWE — confirmed outstanding obligations only
+||==========================================================================
+||      Items               ||   <item, source, currency, outstanding amount>
+||      Total you owe       ||   <confirmed total per currency | Not established>
+||      Completeness        ||   <complete for stated scope | confirmed subtotal — incomplete>
+||      As of / scope       ||   <evidence date, entity, obligations reviewed>
+||      Excluded            ||   <potential fines, disputed claims, estimates>
 ||
 ||==========================================================================
 ||  💊 PRESCRIPTION       next steps in order · nothing has been changed

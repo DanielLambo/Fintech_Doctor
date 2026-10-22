@@ -19,6 +19,18 @@ Discuss each finding separately. Do not sum overlapping statutory theories or un
 
 Flag potential criminal applicability conditionally and identify the missing factual elements. Do not declare the user criminally liable from code or assign a dollar value to criminal exposure. Avoid fear-based labels or promises of legal clearance.
 
+## Total you owe: confirmed obligations
+
+Always render this section, separately from potential exposure. A code defect or statutory maximum is not proof of an amount owed.
+
+- Include only obligations established by supplied evidence, such as an assessed fine, executed settlement, outstanding invoice, or verified payable/refund ledger. Identify the liable entity, source (file:line or document reference), currency, amount, and evidence date. A demand or disputed claim is not a confirmed debt; list it separately.
+- Calculate each outstanding item as the documented obligation minus verified payments and credits. Do not count both a ledger entry and its invoice, combine overlapping penalties, or add remediation budgets, hypothetical losses, or amounts already paid.
+- Sum distinct confirmed outstanding items in each currency. Do not convert currencies without an explicit dated exchange-rate source. Use exact decimal or integer minor-unit arithmetic, not floating point.
+- State the scope and as-of date. Call the result `Confirmed subtotal — incomplete` if any relevant balances, payments, or obligations remain unknown. A numerical total is complete only for a clearly bounded scope with all its items reconciled.
+- When no debt is established, print `Total you owe: Not established from available evidence`. Print zero only when reconciled evidence actually confirms no outstanding amount in the stated scope. Do not ask users to share secret values or unnecessary personal details to establish balances.
+
+Example with fictional supplied documents: an outstanding USD 1,000 invoice, a verified USD 200 payment against it, and a separate USD 300 refund payable yield **USD 1,100** (1,000 − 200 + 300). Cite all three records and their dates. An unassessed potential fine stays outside that total. If other obligations are unknown, label USD 1,100 a confirmed subtotal, not the user's entire debt.
+
 ## Example
 
 ```text
